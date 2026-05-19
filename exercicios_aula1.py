@@ -104,33 +104,69 @@ def medir_complexidade(
 ) -> Dict[int, float]:
     """Mede o tempo médio do brute force para diferentes n."""
     resultados = {}
+
     for n in tamanhos:
         tempos = []
+
         for _ in range(repeticoes):
             tarefas_rand = [
                 {"custo": random.randint(1, 10), "valor": random.randint(5, 50)}
                 for _ in range(n)
             ]
-            # TODO (Ex 3): medir tempo com time.perf_counter()
-            pass
-        # TODO (Ex 3): resultados[n] = média dos tempos em ms
-        pass
+
+            t0 = time.perf_counter()
+            busca_exaustiva(tarefas_rand, capacidade)
+            tempo_ms = (time.perf_counter() - t0) * 1000
+
+            tempos.append(tempo_ms)
+
+        resultados[n] = sum(tempos) / len(tempos)
+
     return resultados
 
 
 def calcular_razoes_crescimento(tempos: Dict[int, float]) -> None:
     """Imprime tabela de tempos e razões de crescimento."""
     ns = sorted(tempos.keys())
-    # TODO (Ex 3): imprimir n | Tempo (ms) | Razão | 2^n
-    pass
+
+    print("\n" + "=" * 65)
+    print("Ex 3 — Análise Empírica de Complexidade")
+    print("=" * 65)
+    print(f"{'n':<6} {'Tempo médio (ms)':>18} {'Razão':>12} {'2^n':>12}")
+    print("-" * 65)
+
+    tempo_anterior = None
+
+    for n in ns:
+        tempo_atual = tempos[n]
+        combinacoes = 2 ** n
+
+        if tempo_anterior is None:
+            razao = "-"
+        else:
+            razao = f"{tempo_atual / tempo_anterior:.2f}x"
+
+        print(f"{n:<6} {tempo_atual:>18.3f} {razao:>12} {combinacoes:>12}")
+
+        tempo_anterior = tempo_atual
+
+    print("\nConclusão:")
+    print("Conforme n aumenta, o número de combinações cresce como 2^n.")
+    print("Por isso, o tempo do Brute Force cresce muito rápido e se torna inviável em instâncias maiores.")
 
 
 # Exercício 4 — Hill Climbing
 
 def gerar_vizinhos(individuo: List[int]) -> List[List[int]]:
     """Gera todos os n vizinhos (soluções a 1 bit de distância)."""
-    # TODO (Ex 4)
-    pass
+    vizinhos = []
+
+    for i in range(len(individuo)):
+        vizinho = individuo[:]
+        vizinho[i] = 1 - vizinho[i]
+        vizinhos.append(vizinho)
+
+    return vizinhos
 
 
 def hill_climbing(
@@ -151,8 +187,27 @@ def hill_climbing(
 
     atual_valor = avaliar_solucao(atual, tarefas, capacidade)
     n_iter = 0
-    # TODO (Ex 4): implementar o loop de hill climbing
-    pass
+
+    for it in range(max_iter):
+        vizinhos = gerar_vizinhos(atual)
+
+        melhor_vizinho = max(
+            vizinhos,
+            key=lambda v: avaliar_solucao(v, tarefas, capacidade)
+        )
+
+        melhor_valor = avaliar_solucao(melhor_vizinho, tarefas, capacidade)
+
+        if melhor_valor > atual_valor:
+            atual = melhor_vizinho
+            atual_valor = melhor_valor
+            n_iter = it + 1
+
+            if verbose:
+                print(f"Iteração {n_iter}: valor = {atual_valor}")
+        else:
+            break
+
     return atual, atual_valor, n_iter
 
 
@@ -175,6 +230,16 @@ def comparar_abordagens(tarefas: List[Dict], capacidade: int) -> None:
     ind_gr, val_gr = greedy_knapsack(tarefas, capacidade)
     tempo_gr = (time.perf_counter() - t0) * 1000
     exibir_solucao(ind_gr, tarefas, f"Ex 2 — Greedy  ({tempo_gr:.3f} ms)")
+    
+    # --- Análise Empírica de Complexidade ---
+    tempos = medir_complexidade([5, 8, 10, 12, 14, 16])
+    calcular_razoes_crescimento(tempos)
+
+    # --- Hill Climbing ---
+    t0 = time.perf_counter()
+    ind_hc, val_hc, iter_hc = hill_climbing(tarefas, capacidade)
+    tempo_hc = (time.perf_counter() - t0) * 1000
+    exibir_solucao(ind_hc, tarefas, f"Ex 4 — Hill Climbing  ({tempo_hc:.3f} ms | {iter_hc} iterações)")
 
     # --- Resumo ---
     diff = val_bf - val_gr
@@ -203,6 +268,10 @@ def comparar_abordagens(tarefas: List[Dict], capacidade: int) -> None:
         f"  {'Greedy':<18}  {'O(n log n)':^14}  {val_gr:>6}  {tempo_gr:>8.3f}ms"
         f"  {otimo_gr:^9}  {'Sim':^9}  {'Sub-ótimo':^20}"
     )
+    print(
+        f"  {'Hill Climbing':<18}  {'O(n²)·iter':^14}  {val_hc:>6}  {tempo_hc:>8.3f}ms"
+        f"  {'Não':^9}  {'Sim':^9}  {'Mínimos locais':^20}"
+    )
  
  
 def _assert_ex1() -> None:
@@ -221,6 +290,23 @@ def _assert_ex2() -> None:
     assert custo <= CAPACIDADE, "Capacidade ultrapassada no Ex 2!"
     assert val > 0, "Valor zero no Ex 2!"
     print(f"Ex 2 OK — valor={val}, custo={custo}")
+
+def _assert_ex3() -> None:
+    tempos = medir_complexidade([5, 8, 10], repeticoes=1)
+
+    assert len(tempos) == 3, "Ex 3 não retornou todos os tamanhos!"
+    assert all(t > 0 for t in tempos.values()), "Ex 3 retornou tempo inválido!"
+
+    print("Ex 3 OK — análise empírica executada")
+
+def _assert_ex4() -> None:
+    ind, val, n_iter = hill_climbing(TAREFAS, CAPACIDADE)
+    custo = sum(TAREFAS[i]["custo"] for i in range(len(TAREFAS)) if ind[i] == 1)
+
+    assert custo <= CAPACIDADE, "Capacidade ultrapassada no Ex 4!"
+    assert val > 0, "Valor zero no Ex 4!"
+
+    print(f"Ex 4 OK — valor={val}, custo={custo}, iterações={n_iter}")
  
  
 # Entry point
@@ -230,5 +316,7 @@ if __name__ == "__main__":
  
     _assert_ex1()
     _assert_ex2()
+    _assert_ex3()
+    _assert_ex4()
  
     comparar_abordagens(TAREFAS, CAPACIDADE)
